@@ -1,11 +1,11 @@
 # 📚 DocMind RAG — Chat with Any PDF using AI
 
-> **Upload any PDF and ask questions** — get accurate, page-cited answers powered by Retrieval-Augmented Generation (RAG) with Google Gemini, FastEmbed, and in-memory Qdrant.
+> **Upload any PDF and ask questions** — get accurate, page-cited answers powered by Retrieval-Augmented Generation (RAG) with HuggingFace LLMs, FastEmbed, and in-memory Qdrant.
 
 <!-- Add your demo GIF/screenshot here after deploying -->
 <!-- ![Demo](docs/demo.gif) -->
 
-**🔗 [Live Demo](#) · [Get Free Gemini API Key](https://aistudio.google.com/apikey)**
+**🔗 [Live Demo](https://ragdeployedtest.streamlit.app/) · [Get Free HuggingFace Token](https://huggingface.co/settings/tokens)**
 
 ---
 
@@ -74,7 +74,7 @@
 | Frontend | Streamlit (ChatGPT-style UI) |
 | Vector DB | Qdrant (in-memory for web app / Docker for CLI) |
 | Embeddings | FastEmbed — `BAAI/bge-small-en-v1.5` (384-dim, CPU) |
-| LLM | Google Gemini 2.0 Flash (free tier) |
+| LLM | HuggingFace Inference API (Mistral 7B, Zephyr 7B, Phi-3, Qwen 2.5) |
 | PDF Loader | PyPDF |
 
 ---
@@ -199,4 +199,4 @@ This project is open-source under the [MIT License](LICENSE).
 
 ---
 
-> Built with ❤️ using LangChain, Qdrant, FastEmbed, Google Gemini, and Streamlit.
+> Built with ❤️ using LangChain, Qdrant, FastEmbed, HuggingFace, and Streamlit.

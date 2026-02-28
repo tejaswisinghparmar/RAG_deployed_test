@@ -1,8 +1,9 @@
 """
 app.py — Streamlit ChatGPT-style RAG Interface
 
-Upload any PDF, enter your free Gemini API key, and chat with your
+Upload any PDF, enter your free HuggingFace token, and chat with your
 document. Everything runs in-memory — no external database needed.
+Uses HuggingFace's free Inference API — no rate limit worries.
 
 Deploy for free on Streamlit Community Cloud.
 
@@ -11,29 +12,26 @@ Usage (local):
 """
 
 import tempfile
-import time
 from pathlib import Path
 
 import streamlit as st
+from huggingface_hub import InferenceClient
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_qdrant import QdrantVectorStore
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # ── Constants ───────────────────────────────────────────────────────
 EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
-CHUNK_SIZE = 1000
-CHUNK_OVERLAP = 400
+CHUNK_SIZE = 1500       # larger chunks = fewer embeddings = faster indexing
+CHUNK_OVERLAP = 300
 TOP_K = 4
-MAX_RETRIES = 3
-RETRY_DELAYS = [5, 15, 30]  # seconds to wait between retries
 
 AVAILABLE_MODELS = {
-    "gemini-2.0-flash": "Fast & capable (15 RPM free)",
-    "gemini-1.5-flash": "Stable & reliable (15 RPM free)",
-    "gemini-1.5-flash-8b": "Lightweight (30 RPM free)",
-    "gemini-2.0-flash-lite": "Cheapest (lower free quota)",
+    "mistralai/Mistral-7B-Instruct-v0.3": "Mistral 7B — Fast & good",
+    "HuggingFaceH4/zephyr-7b-beta": "Zephyr 7B — Conversational",
+    "microsoft/Phi-3-mini-4k-instruct": "Phi-3 Mini — Compact & smart",
+    "Qwen/Qwen2.5-7B-Instruct": "Qwen 2.5 7B — Multilingual",
 }
 
 # ── Page Config ─────────────────────────────────────────────────────
@@ -68,45 +66,48 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# ── Cached Embedding Model (shared across sessions) ────────────────
+# ── Cached Embedding Model ─────────────────────────────────────────
 @st.cache_resource(show_spinner="⏳ Loading embedding model (first time only)...")
 def get_embedding_model():
     return FastEmbedEmbeddings(model_name=EMBEDDING_MODEL)
 
 
-# ── PDF Processing ──────────────────────────────────────────────────
+# ── PDF Processing with Progress ───────────────────────────────────
 def process_pdf(uploaded_file, embedding_model):
     """Load PDF -> chunk -> embed -> return in-memory vector store."""
-    # Save to temp file (PyPDFLoader needs a file path)
+    progress = st.progress(0, text="Loading PDF...")
+
+    # Save to temp file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         tmp.write(uploaded_file.getbuffer())
         tmp_path = tmp.name
 
     # Load
     docs = PyPDFLoader(file_path=tmp_path).load()
-
-    # Clean up temp file
     Path(tmp_path).unlink(missing_ok=True)
+    progress.progress(20, text=f"Loaded {len(docs)} pages. Chunking...")
 
     # Chunk
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP
     )
     chunks = splitter.split_documents(docs)
+    progress.progress(40, text=f"Created {len(chunks)} chunks. Embedding...")
 
-    # Embed & store in-memory (no external DB needed)
+    # Embed & store in-memory
     vector_store = QdrantVectorStore.from_documents(
         documents=chunks,
         embedding=embedding_model,
         location=":memory:",
         collection_name="uploaded_pdf",
     )
+    progress.progress(100, text="✅ Done!")
     return vector_store, len(docs), len(chunks)
 
 
 # ── RAG Pipeline ────────────────────────────────────────────────────
-def retrieve_and_generate(query: str, vector_db, api_key: str, model: str):
-    """Retrieve -> Prompt -> Generate with auto-retry on rate limits."""
+def retrieve_and_generate(query: str, vector_db, hf_token: str, model_id: str):
+    """Retrieve -> Prompt -> Generate using HuggingFace Inference API."""
     # 1. Retrieve
     results = vector_db.similarity_search(query=query, k=TOP_K)
 
@@ -120,38 +121,26 @@ def retrieve_and_generate(query: str, vector_db, api_key: str, model: str):
     context = "\n\n".join(context_parts)
 
     # 3. Prompt
-    system_prompt = f"""You are a helpful AI Assistant. Answer the user's
-question ONLY based on the context below. If the context doesn't contain
-the answer, say you don't know. Always cite the relevant Page Number.
-
-Context:
-{context}
-
-User Query: {query}"""
-
-    # 4. Generate with retry
-    llm = ChatGoogleGenerativeAI(
-        model=model, temperature=0.3, google_api_key=api_key
+    system_msg = (
+        "You are a helpful AI Assistant. Answer the user's question ONLY "
+        "based on the context below. If the context doesn't contain the "
+        "answer, say you don't know. Always cite the relevant Page Number."
     )
+    user_msg = f"Context:\n{context}\n\nUser Query: {query}"
 
-    last_error = None
-    for attempt in range(MAX_RETRIES):
-        try:
-            response = llm.invoke(system_prompt)
-            return response.content, list(dict.fromkeys(sources))
-        except Exception as e:
-            err = str(e)
-            last_error = e
-            if "RESOURCE_EXHAUSTED" in err or "429" in err:
-                if attempt < MAX_RETRIES - 1:
-                    delay = RETRY_DELAYS[attempt]
-                    st.toast(f"⏳ Rate limited — retrying in {delay}s (attempt {attempt + 2}/{MAX_RETRIES})...")
-                    time.sleep(delay)
-                    continue
-            else:
-                raise  # non-rate-limit errors propagate immediately
-
-    raise last_error  # all retries exhausted
+    # 4. Generate via HuggingFace Inference API
+    client = InferenceClient(token=hf_token)
+    response = client.chat_completion(
+        model=model_id,
+        messages=[
+            {"role": "system", "content": system_msg},
+            {"role": "user", "content": user_msg},
+        ],
+        max_tokens=1024,
+        temperature=0.3,
+    )
+    answer = response.choices[0].message.content
+    return answer, list(dict.fromkeys(sources))
 
 
 # ── Session State Init ──────────────────────────────────────────────
@@ -170,30 +159,30 @@ for key, default in {
 st.markdown("""
 <div class="main-header">
     <h1>📚 DocMind RAG</h1>
-    <p>Upload a PDF, paste your free Gemini API key, and start chatting with your document</p>
+    <p>Upload a PDF, paste your free HuggingFace token, and chat with your document</p>
 </div>
 """, unsafe_allow_html=True)
 
 
-# ── Sidebar — Setup Panel ──────────────────────────────────────────
+# ── Sidebar ─────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("### 🔧 Setup")
 
-    # API Key input
-    api_key = st.text_input(
-        "🔑 Google Gemini API Key",
+    # Token input
+    hf_token = st.text_input(
+        "🔑 HuggingFace Token",
         type="password",
-        placeholder="Paste your API key here",
-        help="Get a free key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)",
+        placeholder="hf_xxxxxxxxxxxxxxxxxxxx",
+        help="Get a free token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)",
     )
 
     # Model selector
     selected_model = st.selectbox(
-        "🧠 Gemini Model",
+        "🧠 Model",
         options=list(AVAILABLE_MODELS.keys()),
-        format_func=lambda m: f"{m}  —  {AVAILABLE_MODELS[m]}",
+        format_func=lambda m: AVAILABLE_MODELS[m],
         index=0,
-        help="If one model hits rate limits, switch to another — each has its own quota.",
+        help="All models are free. Switch if one is slow.",
     )
 
     st.divider()
@@ -202,33 +191,31 @@ with st.sidebar:
     uploaded_file = st.file_uploader(
         "📄 Upload a PDF",
         type=["pdf"],
-        help="Your file is processed in-memory and never stored on any server.",
+        help="Processed in-memory only — never stored.",
     )
 
     # Process button
-    if uploaded_file and api_key:
+    if uploaded_file and hf_token:
         is_new_file = uploaded_file.name != st.session_state.pdf_name
 
         if is_new_file:
             if st.button("⚡ Process & Index PDF", use_container_width=True, type="primary"):
                 embedding_model = get_embedding_model()
-                with st.spinner(f"Processing **{uploaded_file.name}**..."):
-                    vector_db, pages, chunks = process_pdf(uploaded_file, embedding_model)
-                    st.session_state.vector_db = vector_db
-                    st.session_state.pdf_name = uploaded_file.name
-                    st.session_state.page_count = pages
-                    st.session_state.chunk_count = chunks
-                    st.session_state.messages = []  # reset chat for new doc
-                st.success(f"✅ Indexed **{pages}** pages into **{chunks}** chunks")
+                vector_db, pages, chunks = process_pdf(uploaded_file, embedding_model)
+                st.session_state.vector_db = vector_db
+                st.session_state.pdf_name = uploaded_file.name
+                st.session_state.page_count = pages
+                st.session_state.chunk_count = chunks
+                st.session_state.messages = []
+                st.success(f"✅ Indexed **{pages}** pages → **{chunks}** chunks")
         else:
             st.success(f"✅ **{uploaded_file.name}** ready ({st.session_state.page_count} pages)")
 
-    elif not api_key:
-        st.info("👆 Paste your free [Gemini API key](https://aistudio.google.com/apikey) to get started.")
+    elif not hf_token:
+        st.info("👆 Paste your free [HuggingFace token](https://huggingface.co/settings/tokens) to start.")
 
     st.divider()
 
-    # About section
     st.markdown(
         """
         ### ℹ️ About
@@ -236,12 +223,12 @@ with st.sidebar:
         with page-level citations.
 
         **Your data is safe:**
-        - PDF is processed in-memory only
-        - API key is never stored
-        - Nothing is saved after you close the tab
+        - PDF processed in-memory only
+        - Token never stored
+        - Nothing saved after you close
 
         **Tech Stack:**
-        🔍 Qdrant (in-memory) · 🧠 Gemini · ⚡ FastEmbed · 🐍 LangChain
+        🔍 Qdrant · 🧠 HuggingFace · ⚡ FastEmbed · 🐍 LangChain
         """
     )
 
@@ -252,24 +239,24 @@ with st.sidebar:
 
 
 # ── Main Area ───────────────────────────────────────────────────────
-if not api_key or not st.session_state.vector_db:
-    # Onboarding state
+if not hf_token or not st.session_state.vector_db:
     st.markdown("""
     <div class="setup-card">
         <h3>👋 Welcome! Get started in 2 steps:</h3>
         <ol style="color: #B0B0B0; line-height: 2;">
-            <li>Paste your <strong>free</strong> <a href="https://aistudio.google.com/apikey" target="_blank">Google Gemini API key</a> in the sidebar</li>
+            <li>Paste your <strong>free</strong> <a href="https://huggingface.co/settings/tokens" target="_blank">HuggingFace token</a> in the sidebar</li>
             <li>Upload a <strong>PDF</strong> file and click <strong>Process</strong></li>
         </ol>
         <p style="color: #777; font-size: 0.85rem; margin-bottom: 0;">
-            🔒 Your API key and document stay in your browser session — nothing is stored.
+            🔒 100% free — no credit card, no rate limits, no data stored.<br>
+            💡 Get your token: <a href="https://huggingface.co/settings/tokens" target="_blank">huggingface.co/settings/tokens</a> → New token → Read access
         </p>
     </div>
     """, unsafe_allow_html=True)
 
 else:
     # ── Chat Interface ──────────────────────────────────────────────
-    st.caption(f"💬 Chatting with **{st.session_state.pdf_name}**")
+    st.caption(f"💬 Chatting with **{st.session_state.pdf_name}** · Model: `{selected_model.split('/')[-1]}`")
 
     # Display history
     for msg in st.session_state.messages:
@@ -281,17 +268,15 @@ else:
 
     # Chat input
     if prompt := st.chat_input("Ask a question about your document..."):
-        # User message
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user", avatar="🧑‍💻"):
             st.markdown(prompt)
 
-        # Assistant response
         with st.chat_message("assistant", avatar="🤖"):
             with st.spinner("Thinking..."):
                 try:
                     answer, sources = retrieve_and_generate(
-                        prompt, st.session_state.vector_db, api_key, selected_model
+                        prompt, st.session_state.vector_db, hf_token, selected_model
                     )
                     st.markdown(answer)
                     if sources:
@@ -302,18 +287,12 @@ else:
                     )
                 except Exception as e:
                     err = str(e)
-                    if "API_KEY_INVALID" in err or "PERMISSION_DENIED" in err:
-                        error_msg = "❌ Invalid API key. Please check your Gemini API key in the sidebar."
-                    elif "RESOURCE_EXHAUSTED" in err or "429" in err:
-                        error_msg = (
-                            f"⏳ Rate limit exhausted for **{selected_model}** after {MAX_RETRIES} retries.\n\n"
-                            "**Try one of these:**\n"
-                            "- Switch to a **different model** in the sidebar (each has its own quota)\n"
-                            "- Wait a minute and try again\n"
-                            "- If daily quota is hit, try again tomorrow or use a different API key"
-                        )
+                    if "401" in err or "Unauthorized" in err or "Invalid" in err:
+                        error_msg = "❌ Invalid token. Check your HuggingFace token in the sidebar."
+                    elif "loading" in err.lower() or "unavailable" in err.lower():
+                        error_msg = "⏳ Model is waking up (~30s). Try again in a moment or switch models."
                     else:
-                        error_msg = f"⚠️ Error: {err}"
+                        error_msg = f"⚠️ Error: {err}\n\nTry switching to a different model in the sidebar."
                     st.error(error_msg)
                     st.session_state.messages.append(
                         {"role": "assistant", "content": error_msg}
