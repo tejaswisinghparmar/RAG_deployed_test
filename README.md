@@ -2,7 +2,7 @@
 
 > **Upload any PDF and ask questions** — get accurate, page-cited answers powered by Retrieval-Augmented Generation (RAG) with a free HuggingFace LLM, FastEmbed, and in-memory Qdrant.
 
-**[Live Demo](https://ragdeployedtest.streamlit.app/) · [GitHub](https://github.com/tejaswisinghparmar/RAG_deployed_test)**
+**[Live Demo](https://inkwell-rag.streamlit.app/) · [GitHub](https://github.com/tejaswisinghparmar/Inkwell-rag)**
 
 ---
 
@@ -104,8 +104,8 @@
 ### Option A: Web UI (Recommended)
 
 ```bash
-git clone https://github.com/tejaswisinghparmar/RAG_deployed_test.git
-cd RAG_deployed_test
+git clone https://github.com/tejaswisinghparmar/Inkwell-rag.git
+cd Inkwell-rag
 python -m venv venv && source venv/bin/activate  # Windows: .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
