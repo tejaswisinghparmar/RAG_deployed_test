@@ -41,10 +41,8 @@ st.set_page_config(
 # ── Custom CSS — Dark Aesthetic Theme ───────────────────────────────
 st.markdown("""
 <style>
-    /* ── Import font ─────────────────────────────────────────────── */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@1,400;1,600&display=swap');
 
-    /* ── Base ────────────────────────────────────────────────────── */
     .stApp {
         background: linear-gradient(160deg, #0d0d0d 0%, #1a1a2e 50%, #16213e 100%);
         font-family: 'Inter', sans-serif;
@@ -60,7 +58,7 @@ st.markdown("""
     /* ── Header ──────────────────────────────────────────────────── */
     .main-header {
         text-align: center;
-        padding: 2.5rem 0 0.5rem 0;
+        padding: 2rem 0 0.3rem 0;
     }
     .main-header h1 {
         font-family: 'Playfair Display', serif;
@@ -82,20 +80,20 @@ st.markdown("""
         letter-spacing: 0.03em;
     }
 
-    /* ── Welcome card ────────────────────────────────────────────── */
-    .setup-card {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+    /* ── Upload zone ─────────────────────────────────────────────── */
+    .upload-zone {
+        background: rgba(255, 255, 255, 0.025);
+        border: 1px dashed rgba(255, 255, 255, 0.12);
         border-radius: 16px;
-        padding: 2rem;
-        margin: 1.5rem 0;
-        backdrop-filter: blur(10px);
+        padding: 1.5rem;
+        margin: 1rem auto;
+        max-width: 520px;
+        text-align: center;
     }
-    .setup-card h3 {
-        color: #e0e0e0;
-        font-weight: 500;
-        margin-top: 0;
-        font-size: 1.15rem;
+    .upload-zone p {
+        color: rgba(255,255,255,0.4);
+        font-size: 0.85rem;
+        margin: 0.5rem 0 0 0;
     }
 
     /* ── Chat messages ───────────────────────────────────────────── */
@@ -111,9 +109,7 @@ st.markdown("""
         border: 1px solid rgba(255, 255, 255, 0.1) !important;
         border-radius: 12px !important;
     }
-    .stChatInput textarea {
-        color: #e0e0e0 !important;
-    }
+    .stChatInput textarea { color: #e0e0e0 !important; }
 
     /* ── Buttons ─────────────────────────────────────────────────── */
     .stButton > button[kind="primary"] {
@@ -135,15 +131,14 @@ st.markdown("""
         transition: all 0.2s ease;
     }
 
-    /* ── File uploader ───────────────────────────────────────────── */
+    /* ── File uploader (main page) ───────────────────────────────── */
     section[data-testid="stFileUploader"] {
-        background: rgba(255, 255, 255, 0.02);
-        border: 1px dashed rgba(255, 255, 255, 0.12);
-        border-radius: 12px;
-        padding: 0.5rem;
+        background: transparent;
+        border: none;
+        padding: 0;
     }
 
-    /* ── Expander (sources) ──────────────────────────────────────── */
+    /* ── Expander ────────────────────────────────────────────────── */
     .streamlit-expanderHeader {
         background: rgba(255, 255, 255, 0.03) !important;
         border-radius: 8px !important;
@@ -152,9 +147,7 @@ st.markdown("""
     }
 
     /* ── Divider ─────────────────────────────────────────────────── */
-    hr {
-        border-color: rgba(255, 255, 255, 0.06) !important;
-    }
+    hr { border-color: rgba(255, 255, 255, 0.06) !important; }
 
     /* ── Scrollbar ───────────────────────────────────────────────── */
     ::-webkit-scrollbar { width: 6px; }
@@ -173,23 +166,66 @@ st.markdown("""
     /* ── Hide Streamlit chrome ───────────────────────────────────── */
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }
-    /* Keep header visible so sidebar toggle arrow works */
-    header[data-testid="stHeader"] {
-        background: transparent !important;
-    }
+    header[data-testid="stHeader"] { background: transparent !important; }
 
-    /* ── Sidebar text colors ─────────────────────────────────────── */
+    /* ── Sidebar text ────────────────────────────────────────────── */
     section[data-testid="stSidebar"] .stMarkdown p,
     section[data-testid="stSidebar"] .stMarkdown li {
         color: rgba(255, 255, 255, 0.55);
-        font-size: 0.88rem;
+        font-size: 0.85rem;
     }
     section[data-testid="stSidebar"] .stMarkdown h3 {
         color: rgba(255, 255, 255, 0.8);
-        font-size: 0.95rem;
+        font-size: 0.9rem;
         font-weight: 500;
         letter-spacing: 0.05em;
         text-transform: uppercase;
+        margin-bottom: 0.5rem;
+    }
+
+    /* ── Query log buttons in sidebar ────────────────────────────── */
+    .query-log-btn {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 0.55rem 0.75rem;
+        margin: 0.2rem 0;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        border-radius: 8px;
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 0.82rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .query-log-btn:hover {
+        background: rgba(118, 75, 162, 0.15);
+        border-color: rgba(118, 75, 162, 0.3);
+        color: rgba(255, 255, 255, 0.85);
+    }
+    .query-log-btn.active {
+        background: rgba(118, 75, 162, 0.2);
+        border-color: rgba(118, 75, 162, 0.4);
+        color: #e0c3fc;
+    }
+
+    /* ── Status pill ─────────────────────────────────────────────── */
+    .status-pill {
+        display: inline-block;
+        padding: 0.2rem 0.6rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        margin-left: 0.5rem;
+    }
+    .status-ready {
+        background: rgba(46, 213, 115, 0.15);
+        color: #2ed573;
+        border: 1px solid rgba(46, 213, 115, 0.25);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -271,6 +307,7 @@ for key, default in {
     "pdf_name": None,
     "page_count": 0,
     "chunk_count": 0,
+    "scroll_to": None,
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -285,21 +322,75 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# ── Sidebar ─────────────────────────────────────────────────────────
+# ── Sidebar — Query Log ────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("### Upload Document")
+    st.markdown("### Query History")
 
-    uploaded_file = st.file_uploader(
-        "Choose a PDF",
-        type=["pdf"],
-        help="Processed in-memory only — never stored.",
-        label_visibility="collapsed",
-    )
+    # Collect all user queries from messages
+    user_queries = [
+        (i, msg["content"])
+        for i, msg in enumerate(st.session_state.messages)
+        if msg["role"] == "user"
+    ]
 
-    if uploaded_file:
-        is_new_file = uploaded_file.name != st.session_state.pdf_name
+    if user_queries:
+        for msg_idx, query_text in user_queries:
+            truncated = query_text[:50] + ("..." if len(query_text) > 50 else "")
+            if st.button(
+                f"💬 {truncated}",
+                key=f"qlog_{msg_idx}",
+                use_container_width=True,
+            ):
+                st.session_state.scroll_to = msg_idx
+                st.rerun()
+    else:
+        st.markdown(
+            '<p style="color: rgba(255,255,255,0.3); font-size: 0.82rem;">'
+            "No queries yet. Upload a PDF and ask a question.</p>",
+            unsafe_allow_html=True,
+        )
 
-        if is_new_file:
+    st.divider()
+
+    # Document status
+    if st.session_state.pdf_name:
+        st.markdown(
+            f'### Active Document\n\n'
+            f'**{st.session_state.pdf_name}**  \n'
+            f'{st.session_state.page_count} pages · '
+            f'{st.session_state.chunk_count} chunks'
+        )
+    else:
+        st.markdown(
+            '<p style="color: rgba(255,255,255,0.3); font-size: 0.82rem;">'
+            "No document loaded.</p>",
+            unsafe_allow_html=True,
+        )
+
+    st.divider()
+
+    if st.session_state.messages:
+        if st.button("Clear Chat", use_container_width=True):
+            st.session_state.messages = []
+            st.session_state.scroll_to = None
+            st.rerun()
+
+
+# ── Main Area — Upload or Chat ──────────────────────────────────────
+if not st.session_state.vector_db:
+    # ── Upload Zone (main page) ─────────────────────────────────────
+    st.markdown("")  # spacing
+
+    col1, col2, col3 = st.columns([1, 3, 1])
+    with col2:
+        uploaded_file = st.file_uploader(
+            "Upload a PDF to get started",
+            type=["pdf"],
+            help="Processed in-memory only — never stored.",
+            label_visibility="visible",
+        )
+
+        if uploaded_file:
             if st.button("Process & Index", use_container_width=True, type="primary"):
                 embedding_model = get_embedding_model()
                 vector_db, pages, chunks = process_pdf(uploaded_file, embedding_model)
@@ -308,56 +399,45 @@ with st.sidebar:
                 st.session_state.page_count = pages
                 st.session_state.chunk_count = chunks
                 st.session_state.messages = []
-                st.success(f"Indexed **{pages}** pages into **{chunks}** chunks")
+                st.rerun()
         else:
-            st.success(f"**{uploaded_file.name}** ready ({st.session_state.page_count} pages)")
-
-    st.divider()
-
-    st.markdown(
-        """
-        ### About
-        **Inkwell** answers questions from your PDF
-        with page-level citations.
-
-        Your data stays safe — processed in-memory,
-        nothing saved after you close the tab.
-
-        **Stack:** Qdrant / HuggingFace / FastEmbed / LangChain
-        """
-    )
-
-    st.divider()
-    if st.button("Clear Chat", use_container_width=True):
-        st.session_state.messages = []
-        st.rerun()
-
-
-# ── Main Area ───────────────────────────────────────────────────────
-if not st.session_state.vector_db:
-    st.markdown("""
-    <div class="setup-card">
-        <h3>Welcome — get started in one step</h3>
-        <ol style="color: rgba(255,255,255,0.5); line-height: 2.2; padding-left: 1.2rem;">
-            <li>Upload a <strong style="color:rgba(255,255,255,0.75);">PDF</strong> in the sidebar and click <strong style="color:rgba(255,255,255,0.75);">Process</strong></li>
-        </ol>
-        <p style="color: rgba(255,255,255,0.3); font-size: 0.82rem; margin-bottom: 0; margin-top: 1rem;">
-            100% free — no sign-up, no API keys, no data stored.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+            st.markdown(
+                '<p style="color: rgba(255,255,255,0.35); font-size: 0.82rem; text-align: center;">'
+                "100% free — no sign-up, no data stored.</p>",
+                unsafe_allow_html=True,
+            )
 
 else:
     # ── Chat Interface ──────────────────────────────────────────────
     st.caption(f"Chatting with {st.session_state.pdf_name}")
 
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"], avatar="🧑‍💻" if msg["role"] == "user" else "🖋️"):
+    # Display chat history with anchor IDs for scroll-to
+    for i, msg in enumerate(st.session_state.messages):
+        # Inject scroll anchor for each message
+        st.markdown(f'<div id="msg-{i}"></div>', unsafe_allow_html=True)
+
+        avatar = "🧑‍💻" if msg["role"] == "user" else "🖋️"
+        with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
             if msg.get("sources"):
                 with st.expander("Sources"):
                     st.markdown(" · ".join(msg["sources"]))
 
+    # Scroll to a specific message if requested from sidebar
+    if st.session_state.scroll_to is not None:
+        target = st.session_state.scroll_to
+        st.markdown(
+            f"""
+            <script>
+                const el = document.getElementById('msg-{target}');
+                if (el) {{ el.scrollIntoView({{ behavior: 'smooth', block: 'start' }}); }}
+            </script>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.session_state.scroll_to = None
+
+    # Chat input
     if prompt := st.chat_input("Ask something about your document..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user", avatar="🧑‍💻"):
@@ -388,3 +468,23 @@ else:
                     st.session_state.messages.append(
                         {"role": "assistant", "content": error_msg}
                     )
+
+    # Option to upload a new PDF
+    with st.expander("Upload a different PDF"):
+        new_file = st.file_uploader(
+            "Replace document",
+            type=["pdf"],
+            key="new_pdf_uploader",
+            label_visibility="collapsed",
+        )
+        if new_file and new_file.name != st.session_state.pdf_name:
+            if st.button("Process New PDF", type="primary", use_container_width=True):
+                embedding_model = get_embedding_model()
+                vector_db, pages, chunks = process_pdf(new_file, embedding_model)
+                st.session_state.vector_db = vector_db
+                st.session_state.pdf_name = new_file.name
+                st.session_state.page_count = pages
+                st.session_state.chunk_count = chunks
+                st.session_state.messages = []
+                st.session_state.scroll_to = None
+                st.rerun()
