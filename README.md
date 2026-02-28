@@ -1,9 +1,11 @@
-# 📚 PDF RAG Pipeline — Document Q&A with Qdrant + LangChain + Gemini
+# 📚 DocMind RAG — Chat with Any PDF using AI
 
-> **Domain-specific Retrieval-Augmented Generation (RAG)** pipeline that ingests PDF documents, indexes them in a Qdrant vector database, and answers natural-language questions with page-level citations — powered by Google Gemini and FastEmbed.
+> **Upload any PDF and ask questions** — get accurate, page-cited answers powered by Retrieval-Augmented Generation (RAG) with Google Gemini, FastEmbed, and in-memory Qdrant.
 
-<!-- Replace with your own demo GIF / screenshot -->
+<!-- Add your demo GIF/screenshot here after deploying -->
 <!-- ![Demo](docs/demo.gif) -->
+
+**🔗 [Live Demo](#) · [Get Free Gemini API Key](https://aistudio.google.com/apikey)**
 
 ---
 
@@ -11,29 +13,54 @@
 
 | Feature | Details |
 |---|---|
-| **PDF Ingestion** | Automatic page-by-page loading via `PyPDFLoader` |
-| **Smart Chunking** | Recursive character splitting (1 000 tokens, 400-token overlap) to preserve context across chunk boundaries |
-| **Fast Embeddings** | `BAAI/bge-small-en-v1.5` (384-dim) via FastEmbed — lightweight, runs on CPU |
-| **Vector Storage** | Qdrant (Cosine similarity) with Docker for easy setup & persistence |
-| **LLM Generation** | Google Gemini (`gemini-2.5-flash-lite` / `gemini-2.0-flash-lite`) with grounded, citation-aware prompts |
-| **Two Chat Modes** | Single-query mode (`chat.py`) and interactive multi-turn loop (`chat_autorun.py`) |
-| **Page Citations** | Every answer references the source page number so you can verify in the original PDF |
+| **Upload Any PDF** | Users upload their own PDF — no pre-indexed data needed |
+| **BYOK (Bring Your Own Key)** | Each user provides their own free Gemini API key — your API key stays safe |
+| **In-Memory Processing** | PDF is chunked, embedded, and stored in-memory — nothing is saved after the session |
+| **Smart Chunking** | Recursive splitting (1 000 tokens, 400-token overlap) preserves context across pages |
+| **Fast Embeddings** | `BAAI/bge-small-en-v1.5` (384-dim) via FastEmbed — runs on CPU, zero API cost |
+| **Page Citations** | Every answer references the exact page number for easy verification |
+| **ChatGPT-style UI** | Clean, dark-themed chat interface built with Streamlit |
+| **Privacy-first** | No data stored, no API keys saved — everything dies when you close the tab |
+| **CLI Tools** | Bonus: CLI scripts for local batch indexing and terminal-based chat |
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-┌──────────┐    ┌────────────┐    ┌──────────────┐    ┌────────┐    ┌────────────┐
-│  PDF Doc  │──▶│  Chunking   │──▶│  FastEmbed    │──▶│ Qdrant  │    │   Gemini   │
-│ (PyPDF)   │   │ (Recursive) │   │ bge-small-en  │   │ VectorDB│    │    LLM     │
-└──────────┘    └────────────┘    └──────────────┘    └───┬────┘    └─────┬──────┘
-                                                          │               │
-                                                          ▼               │
-                                                   ┌────────────┐        │
-                                          Query ──▶│  Retriever  │───────▶│
-                                                   │  (top-k=4)  │  context  ──▶ Answer
-                                                   └────────────┘
+                          ┌─────────────────────────────────────────────┐
+                          │            Streamlit Web App                │
+                          └─────────────────────────────────────────────┘
+                                            │
+                     ┌──────────────────────┼──────────────────────┐
+                     ▼                      ▼                      ▼
+              ┌────────────┐      ┌──────────────┐       ┌──────────────┐
+  User ──▶   │  Upload PDF │      │  User Query   │       │  Gemini Key  │
+              └─────┬──────┘      └──────┬───────┘       └──────┬───────┘
+                    │                    │                       │
+                    ▼                    ▼                       │
+           ┌──────────────┐    ┌──────────────────┐             │
+           │  PyPDF Load   │    │     Embed Query   │             │
+           │  + Chunking   │    │  (FastEmbed/CPU)  │             │
+           └──────┬───────┘    └────────┬─────────┘             │
+                  │                     │                       │
+                  ▼                     ▼                       │
+           ┌──────────────┐    ┌──────────────────┐             │
+           │   FastEmbed   │    │  Cosine Search    │             │
+           │  (bge-small)  │    │  Qdrant In-Memory │             │
+           └──────┬───────┘    └────────┬─────────┘             │
+                  │                     │                       │
+                  ▼                     ▼                       ▼
+           ┌──────────────┐    ┌──────────────────────────────────┐
+           │ Qdrant Store  │    │  System Prompt + Context + Query │
+           │  (in-memory)  │    │         → Google Gemini LLM      │
+           └──────────────┘    └──────────────┬───────────────────┘
+                                              │
+                                              ▼
+                                     ┌──────────────┐
+                                     │   Answer +    │
+                                     │  Page Cited   │
+                                     └──────────────┘
 ```
 
 ---
@@ -44,11 +71,11 @@
 |---|---|
 | Language | Python 3.10+ |
 | Framework | LangChain |
-| Vector DB | Qdrant (Docker) |
-| Embeddings | FastEmbed (`BAAI/bge-small-en-v1.5`, 384-dim) |
-| LLM | Google Gemini (Flash Lite) |
+| Frontend | Streamlit (ChatGPT-style UI) |
+| Vector DB | Qdrant (in-memory for web app / Docker for CLI) |
+| Embeddings | FastEmbed — `BAAI/bge-small-en-v1.5` (384-dim, CPU) |
+| LLM | Google Gemini 2.0 Flash (free tier) |
 | PDF Loader | PyPDF |
-| Environment | python-dotenv |
 
 ---
 
@@ -56,12 +83,15 @@
 
 ```
 .
+├── app.py                    # 🌐 Streamlit web UI (upload PDF + chat)
 ├── rag/
-│   ├── index.py              # Ingestion — load PDF, chunk, embed, store in Qdrant
-│   ├── chat.py               # Single-query RAG chat
-│   ├── chat_autorun.py       # Interactive multi-turn RAG chat loop
-│   └── docker-compose.yml    # One-command Qdrant setup
-├── .env.example              # Template for required environment variables
+│   ├── index.py              # CLI: Ingest PDF → chunk → embed → Qdrant
+│   ├── chat.py               # CLI: Single-query RAG chat
+│   ├── chat_autorun.py       # CLI: Interactive multi-turn chat loop
+│   └── docker-compose.yml    # One-command Qdrant setup (for CLI mode)
+├── .streamlit/
+│   └── config.toml           # Streamlit theme (dark mode)
+├── .env.example              # Template for environment variables
 ├── .gitignore
 ├── requirements.txt
 └── README.md
@@ -69,106 +99,97 @@
 
 ---
 
-## 🚀 Setup & Run
+## 🚀 Quick Start
 
-### Prerequisites
-
-- **Python 3.10+**
-- **Docker** (for Qdrant)
-- A **Google Gemini API key** — get one free at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
-
-### 1. Clone the repo
+### Option A: Web UI (Recommended)
 
 ```bash
 git clone https://github.com/tejaswisinghparmar/RAG.git
 cd RAG
-```
-
-### 2. Create & activate a virtual environment
-
-```bash
-python -m venv venv
-
-# Windows
-.\venv\Scripts\Activate.ps1
-
-# macOS / Linux
-source venv/bin/activate
-```
-
-### 3. Install dependencies
-
-```bash
+python -m venv venv && source venv/bin/activate  # Windows: .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+streamlit run app.py
 ```
 
-### 4. Configure environment variables
+Open **http://localhost:8501** → paste your [free Gemini API key](https://aistudio.google.com/apikey) → upload a PDF → start chatting!
+
+### Option B: CLI Mode (with Docker Qdrant)
 
 ```bash
+# 1. Start Qdrant
+cd rag && docker compose up -d && cd ..
+
+# 2. Configure
 cp .env.example rag/.env
-```
+# Edit rag/.env with your GOOGLE_API_KEY
 
-Open `rag/.env` and paste your Google API key:
-
-```
-GOOGLE_API_KEY="your_actual_key_here"
-```
-
-### 5. Start Qdrant (vector database)
-
-```bash
-cd rag
-docker compose up -d
-```
-
-Qdrant dashboard will be available at **http://localhost:6333/dashboard**.
-
-### 6. Index your PDF
-
-Place your PDF file in the `rag/` folder (update `PDF_FILENAME` in `index.py` if needed), then:
-
-```bash
+# 3. Index a PDF
 python rag/index.py
-```
 
-### 7. Chat with your document
-
-**Single question:**
-```bash
-python rag/chat.py
-```
-
-**Interactive session (multi-turn):**
-```bash
+# 4. Chat
 python rag/chat_autorun.py
 ```
 
 ---
 
+## ☁️ Free Deployment (Streamlit Community Cloud)
+
+The web app needs **zero external services** — no database, no paid APIs.
+
+| What | Where | Cost |
+|---|---|---|
+| Web App | [Streamlit Community Cloud](https://streamlit.io/cloud) | Free (public repos) |
+| LLM | Users bring their own [Gemini key](https://aistudio.google.com/apikey) | Free for users |
+| Vector DB | In-memory (no setup needed) | Free |
+| Embeddings | FastEmbed (runs on CPU) | Free |
+
+### Deploy in 3 Steps
+
+1. **Push to GitHub** — Make sure your repo is public
+2. **Go to [share.streamlit.io](https://share.streamlit.io/)** → Connect your GitHub repo → Set main file to `app.py`
+3. **Done!** Share the URL on your resume. No secrets needed — users bring their own key.
+
+---
+
+## 🔒 Security & Privacy
+
+- **BYOK Model** — Users enter their own Gemini API key. Your key is never exposed.
+- **No Persistent Storage** — PDFs are processed in-memory and discarded when the session ends.
+- **API Keys Not Stored** — Keys exist only in the browser session state.
+- **`.gitignore` Protection** — `.env` files and PDFs are excluded from version control.
+
+---
+
 ## 💡 How It Works
 
-1. **Ingestion (`index.py`)** — The PDF is loaded page-by-page, split into overlapping chunks of ~1 000 tokens, embedded with `bge-small-en-v1.5`, and stored in a Qdrant collection.
-2. **Retrieval** — When the user asks a question, the query is embedded and the top-k most similar chunks are retrieved from Qdrant using cosine similarity.
-3. **Generation** — The retrieved chunks (with page numbers) are injected into a system prompt, and Google Gemini generates a grounded answer with page citations.
+1. **Upload** — User uploads a PDF via the Streamlit sidebar.
+2. **Chunk** — The PDF is split into overlapping chunks (~1 000 tokens each, 400-token overlap) to preserve context across page boundaries.
+3. **Embed** — Each chunk is embedded using `bge-small-en-v1.5` (384-dim vectors) running locally on CPU via FastEmbed.
+4. **Store** — Vectors are stored in an in-memory Qdrant instance (no external database).
+5. **Retrieve** — When the user asks a question, the query is embedded and the top-4 most similar chunks are retrieved via cosine similarity.
+6. **Generate** — Retrieved chunks + page numbers are injected into a system prompt, and Google Gemini generates a grounded, cited answer.
 
 ---
 
 ## 🧠 Challenges & Learnings
 
-- **Chunking strategy matters** — Recursive splitting with 400-token overlap significantly improved retrieval accuracy for questions spanning two pages.
+- **Chunking strategy matters** — Recursive splitting with 400-token overlap significantly improved retrieval accuracy for questions spanning multiple pages.
 - **FastEmbed vs cloud embeddings** — Switched from cloud-based embedding APIs to FastEmbed for zero-cost, offline-capable, and faster indexing on CPU.
-- **Prompt engineering for citation** — Explicitly instructing the LLM to cite page numbers reduced hallucinated answers and improved verifiability.
+- **BYOK for free deployment** — Instead of burning through a shared API quota, letting users bring their own key makes the app sustainably free.
+- **Prompt engineering for citations** — Explicitly instructing the LLM to cite page numbers reduced hallucinated answers and improved verifiability.
+- **In-memory Qdrant** — Using `:memory:` mode eliminates the need for an external database in deployment while keeping the same LangChain API.
 
 ---
 
 ## 🔮 Future Scope
 
-- **Agentic RAG** — Add tool-calling to let the LLM decide when to search, summarise, or ask for clarification.
-- **Hybrid Retrieval** — Combine dense (vector) + sparse (BM25) search for better recall.
-- **Reranking** — Add a cross-encoder reranker (e.g., `ms-marco-MiniLM`) to improve precision after retrieval.
-- **Streamlit / Gradio UI** — Web interface for a more polished demo experience.
-- **Multi-document support** — Ingest multiple PDFs and filter by source at retrieval time.
-- **Evaluation with RAGAS** — Measure faithfulness, answer relevance, and context precision.
+- **Agentic RAG** — Add tool-calling to let the LLM decide when to search, summarise, or ask for clarification
+- **Hybrid Retrieval** — Combine dense (vector) + sparse (BM25) search for better recall
+- **Reranking** — Cross-encoder reranker (e.g., `ms-marco-MiniLM`) for improved precision
+- **Multi-document support** — Upload multiple PDFs and filter by source at retrieval time
+- **Streaming responses** — Token-by-token output for a more responsive feel
+- **Evaluation with RAGAS** — Measure faithfulness, answer relevance, and context precision
+- **Chat history export** — Download conversation as PDF/Markdown
 
 ---
 
@@ -178,4 +199,4 @@ This project is open-source under the [MIT License](LICENSE).
 
 ---
 
-> Built with ❤️ using LangChain, Qdrant, FastEmbed, and Google Gemini.
+> Built with ❤️ using LangChain, Qdrant, FastEmbed, Google Gemini, and Streamlit.

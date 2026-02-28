@@ -20,7 +20,7 @@ from langchain_qdrant import QdrantVectorStore
 COLLECTION_NAME = "harry_potter_fast"
 QDRANT_URL = "http://localhost:6333"
 EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
-LLM_MODEL = "gemini-2.0-flash-lite"
+LLM_MODEL = "gemini-2.0-flash"
 TOP_K = 3  # number of chunks to retrieve per query
 
 load_dotenv()

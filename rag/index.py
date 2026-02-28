@@ -9,21 +9,26 @@ Usage:
     python rag/index.py
 
 Prerequisites:
-    - Qdrant running on http://localhost:6333  (see docker-compose.yml)
+    - Qdrant running locally (docker-compose.yml) OR Qdrant Cloud URL + API key in .env
     - PDF placed in the same directory as this script
 """
 
+import os
 from pathlib import Path
 
+from dotenv import load_dotenv
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+load_dotenv()
+
 # ── Configuration ───────────────────────────────────────────────────
 PDF_FILENAME = "harry-potter-and-the-half-blood-prince-j.k.-rowling.pdf"
-COLLECTION_NAME = "harry_potter_fast"
-QDRANT_URL = "http://localhost:6333"
+COLLECTION_NAME = os.getenv("QDRANT_COLLECTION", "harry_potter_fast")
+QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY", None)
 CHUNK_SIZE = 1000    # tokens per chunk
 CHUNK_OVERLAP = 400  # overlap between consecutive chunks
 EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"  # 384-dim, fast & lightweight
@@ -52,12 +57,16 @@ def main() -> None:
         model_name=EMBEDDING_MODEL,
     )
 
-    QdrantVectorStore.from_documents(
-        documents=chunks,
-        embedding=embedding_model,
-        url=QDRANT_URL,
-        collection_name=COLLECTION_NAME,
-    )
+    kwargs = {
+        "documents": chunks,
+        "embedding": embedding_model,
+        "url": QDRANT_URL,
+        "collection_name": COLLECTION_NAME,
+    }
+    if QDRANT_API_KEY:
+        kwargs["api_key"] = QDRANT_API_KEY
+
+    QdrantVectorStore.from_documents(**kwargs)
     print(f"✅ Indexing complete — collection '{COLLECTION_NAME}' ready at {QDRANT_URL}")
 
 

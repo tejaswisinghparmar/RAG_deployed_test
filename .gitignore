@@ -30,6 +30,9 @@ Thumbs.db
 # Qdrant local storage
 qdrant_storage/
 
+# Streamlit secrets (never commit real keys)
+.streamlit/secrets.toml
+
 # Distribution
 dist/
 build/
