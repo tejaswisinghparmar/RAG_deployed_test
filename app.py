@@ -50,30 +50,11 @@ st.markdown("""
         font-family: 'Inter', sans-serif;
     }
 
-    /* ── Sidebar — hover to reveal when collapsed ────────────────── */
+    /* ── Sidebar ──────────────────────────────────────────────────── */
     section[data-testid="stSidebar"] {
         background: rgba(13, 13, 13, 0.95);
         backdrop-filter: blur(20px);
         border-right: 1px solid rgba(255, 255, 255, 0.06);
-        transition: transform 0.3s ease, opacity 0.3s ease;
-    }
-    section[data-testid="stSidebar"][aria-expanded="false"] {
-        transform: translateX(-100%);
-        opacity: 0;
-    }
-    section[data-testid="stSidebar"][aria-expanded="false"]:hover {
-        transform: translateX(0);
-        opacity: 1;
-    }
-    /* Invisible hover trigger strip on the left edge */
-    section[data-testid="stSidebar"]::before {
-        content: "";
-        position: fixed;
-        left: 0;
-        top: 0;
-        width: 18px;
-        height: 100vh;
-        z-index: 999;
     }
 
     /* ── Header ──────────────────────────────────────────────────── */
@@ -192,7 +173,10 @@ st.markdown("""
     /* ── Hide Streamlit chrome ───────────────────────────────────── */
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }
-    header { visibility: hidden; }
+    /* Keep header visible so sidebar toggle arrow works */
+    header[data-testid="stHeader"] {
+        background: transparent !important;
+    }
 
     /* ── Sidebar text colors ─────────────────────────────────────── */
     section[data-testid="stSidebar"] .stMarkdown p,
